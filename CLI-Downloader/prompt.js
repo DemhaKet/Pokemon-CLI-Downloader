@@ -1,7 +1,7 @@
 import inquirer from 'inquirer'
-import fs from 'fs'
+import fs from 'fs/promises'
 
-console.log('======= POKEMON DOWNLOADER =======')
+console.log(`\n======= POKEMON DOWNLOADER ======= \n`)
 
 const selection = [
     {
@@ -22,118 +22,130 @@ const selection = [
     }
 ]
 
-
+// Prompts user  
 async function ask() {
     const prompt = await inquirer.prompt(selection)
     return prompt 
 }
 
 let pokemonObject = await ask()
+const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonObject['Pokemon name']}`)
+const json = await response.json()
 let spritesUrl = []
 let artworkUrl = ''
 let stats = []
 let dir = ''
 
-async function fetchData() {
-    dir =  `${pokemonObject['Pokemon name']}`
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonObject['Pokemon name']}`)
-    const json = await response.json()
-    fs.mkdir(dir, (err) => {
-        if (err) {
-            console.log(err)
-        }
-    })
 
-    if (Object.values(pokemonObject)[1].includes('Artwork')) {
-        artworkUrl = json.sprites.other['official-artwork'].front_default
-        console.log(artworkUrl)
-        await getArtwork()
-    } 
+// Checks if the directory exists, if not creates it
+async function mkdir() {
+    dir = `${pokemonObject['Pokemon name']}`
 
-    if (Object.values(pokemonObject)[1].includes('Sprites')) {
-        for (const key in json.sprites) {
-            if (key === 'other' || key === 'versions') {
-                continue
-            } else {
-                let spriteKey = key
-                let spriteValue = json.sprites[key]
-                let sprite = {[spriteKey]: spriteValue}
-                if (spriteValue === null) {
-                    continue
-                } else {
-                    spritesUrl.push(sprite)
-                }
-                // console.log(spritesUrl)
-            }
-        }
-        await getSprites()
-        spritesUrl = []
-    }
-
-    if (Object.values(pokemonObject)[1].includes('Stats')) {
-        for (const key in json.stats) {
-            let stat = {}
-            let statName = json.stats[key].stat.name
-            let baseStat = json.stats[key].base_stat
-            stat[statName] = baseStat
-            stats.push(`${Object.keys(stat)}: ${Object.values(stat)}`)
-            // console.log(stats)
-        }
-        await writeStats()
-        stats = []
-    }
-}
-
-// fetchData()
-
-
-async function getArtwork() {
-    const response = await fetch(artworkUrl)
-    const image = await response.arrayBuffer()
-    const buffer = Buffer.from(image)
-
-    fs.writeFile(`${dir}/Artwork.png`, buffer, (err) => {
-        if (err) {
-            console.log(err)
-        } else {
-            console.log('Created: Artwork.png')
-        }
-    })
-}
-
-
-// some values are null for certain pokemons. need to implement handle that
-async function getSprites() {
-    for (let i = 0; i < spritesUrl.length; i++) {
-        const response = await fetch(Object.values(spritesUrl[i]))
-        const image = await response.arrayBuffer()
-        const buffer = Buffer.from(image)
-        const imageName = `${Object.keys(spritesUrl[i])}.png`
-        // console.log(spritesUrl)
-        
-        fs.writeFile(`${dir}/${imageName}`, buffer, (err) => {
+    try {
+        await fs.access(`${dir}`)
+    } catch {
+        fs.mkdir(dir, (err) => {
             if (err) {
                 console.log(err)
-            } else {
-                console.log(`Created: ${imageName}`)
             }
         })
     }
-
 }
 
-async function writeStats() {
-    let all = stats.join('\n')
+// Dynamically assigns the artwork url and calls fetchArtwork()
+async function artworkAll() {
+    if (Object.values(pokemonObject)[1].includes('Artwork')) {
+        artworkUrl = json.sprites.other['official-artwork'].front_default
+        await fetchArtwork()
+    } 
+}
+
+// Fetches the Artwork
+async function fetchArtwork() {
+    const response = await fetch(artworkUrl)
+    const image = await response.arrayBuffer()
+    const buffer = Buffer.from(image)
     
-    fs.writeFile(`./${dir}/stats.txt`, all, (err) => {
-        if (err) {
+    try {
+        await fs.writeFile(`${dir}/Artwork.png`, buffer)
+        console.log('Created: Artwork.png')
+    } catch (err) {
+        console.log(err)
+    }
+    
+}
+
+// Dynamically populates the stats array and calls fetchStats()
+async function statsAll() {
+    if (Object.values(pokemonObject)[1].includes('Stats')) {
+        for (const key in json.stats) {
+            let statName = json.stats[key].stat.name
+            let baseStat = json.stats[key].base_stat
+            stats.push(`${statName}: ${baseStat}`)
+        }
+
+        await fetchStats()
+        stats = []
+
+    }
+}
+
+// Fetches the Stats
+async function fetchStats() {
+    let all = stats.join('\n')
+    try {
+        await fs.writeFile(`./${dir}/stats.txt`, all)
+        console.log('Created stats.txt')
+    } catch (err) {
+        console.log(err)
+    }
+}
+
+// Dynamically populates the spritesUrl array and calls fetchSprites()
+async function spritesAll() {
+    if (Object.values(pokemonObject)[1].includes('Sprites')) {
+        for (const key in json.sprites) {
+            if (key === 'other' || key === 'versions') continue
+            let spriteKey = key
+            let spriteValue = json.sprites[key] 
+            
+            if (!spriteValue) continue // For some pokemons, some values are null
+            let sprite = {[spriteKey]: spriteValue}
+            spritesUrl.push(sprite)   
+        }
+
+        await fetchSprites()
+        spritesUrl = []
+
+    }
+}
+
+// Fetches the Sprites using Promise.all() to excute code asynchronously 
+async function fetchSprites() {
+    const spritesPromises = spritesUrl.map(async (sprite) => {
+        const response = await fetch(Object.values(sprite)[0])
+        const image = await response.arrayBuffer()
+        const buffer = Buffer.from(image)
+        const imageName = `${Object.keys(sprite)[0]}.png`
+        
+        try {
+            await fs.writeFile(`${dir}/${imageName}`, buffer)
+            console.log(`Created: ${imageName}`)
+        } catch (err) {
             console.log(err)
-        } else {
-            console.log('Created stats.txt')
         }
     })
+    
+    await Promise.all(spritesPromises)
+
 }
 
+async function fetchData() {
+    await mkdir()
+    await artworkAll()
+    await spritesAll()
+    await statsAll()    
+}
 
 async function main() {
     while (pokemonObject['Continue?'] === true) {
@@ -144,8 +156,9 @@ async function main() {
             break;
         }
     }
-
-    await fetchData()
+    
+    await fetchData()    
+    console.log(`\n======= POKEMON DOWNLOADER =======\n`)
 
 }
 
