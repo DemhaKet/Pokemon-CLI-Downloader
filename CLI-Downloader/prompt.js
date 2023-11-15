@@ -54,10 +54,8 @@ async function mkdir() {
 
 // Dynamically assigns the artwork url and calls fetchArtwork()
 async function artworkAll() {
-    if (Object.values(pokemonObject)[1].includes('Artwork')) {
-        artworkUrl = json.sprites.other['official-artwork'].front_default
-        await fetchArtwork()
-    } 
+    artworkUrl = json.sprites.other['official-artwork'].front_default
+    await fetchArtwork()
 }
 
 // Fetches the Artwork
@@ -77,17 +75,15 @@ async function fetchArtwork() {
 
 // Dynamically populates the stats array and calls fetchStats()
 async function statsAll() {
-    if (Object.values(pokemonObject)[1].includes('Stats')) {
-        for (const key in json.stats) {
-            let statName = json.stats[key].stat.name
-            let baseStat = json.stats[key].base_stat
-            stats.push(`${statName}: ${baseStat}`)
-        }
-
-        await fetchStats()
-        stats = []
-
+    for (const key in json.stats) {
+        let statName = json.stats[key].stat.name
+        let baseStat = json.stats[key].base_stat
+        stats.push(`${statName}: ${baseStat}`)
     }
+
+    await fetchStats()
+    stats = []
+
 }
 
 // Fetches the Stats
@@ -103,21 +99,19 @@ async function fetchStats() {
 
 // Dynamically populates the spritesUrl array and calls fetchSprites()
 async function spritesAll() {
-    if (Object.values(pokemonObject)[1].includes('Sprites')) {
-        for (const key in json.sprites) {
-            if (key === 'other' || key === 'versions') continue
-            let spriteKey = key
-            let spriteValue = json.sprites[key] 
-            
-            if (!spriteValue) continue // For some pokemons, some values are null
-            let sprite = {[spriteKey]: spriteValue}
-            spritesUrl.push(sprite)   
-        }
-
-        await fetchSprites()
-        spritesUrl = []
-
+    for (const key in json.sprites) {
+        if (key === 'other' || key === 'versions') continue
+        let spriteKey = key
+        let spriteValue = json.sprites[key] 
+        
+        if (!spriteValue) continue // For some pokemons, some values are null
+        let sprite = {[spriteKey]: spriteValue}
+        spritesUrl.push(sprite)   
     }
+
+    await fetchSprites()
+    spritesUrl = []
+
 }
 
 // Fetches the Sprites using Promise.all() to excute code asynchronously 
@@ -142,9 +136,12 @@ async function fetchSprites() {
 
 async function fetchData() {
     await mkdir()
-    await artworkAll()
-    await spritesAll()
-    await statsAll()    
+
+    Object.values(pokemonObject)[1].includes('Artwork') && await artworkAll()
+    
+    Object.values(pokemonObject)[1].includes('Sprites') && await spritesAll()
+
+    Object.values(pokemonObject)[1].includes('Stats') && await statsAll()
 }
 
 async function main() {
